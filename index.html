@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Roblox 遊戲盒 - AI 智能版</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
+
+        :root {
+            --primary: #0984e3;
+            --accent: #00cec9;
+            --danger: #ff7675;
+            --warning: #fdcb6e;
+            --dark: #2d3436;
+            --light: #dfe6e9;
+            --gold: #f1c40f;
+            --ai-color: #a29bfe;
+            --bg-grad: linear-gradient(135deg, #2c3e50, #000);
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg-grad);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Fredoka', sans-serif;
+            overflow: hidden;
+            user-select: none;
+            color: white;
+            touch-action: none;
+        }
+
+        /* --- 遊戲機容器 --- */
+        #game-container {
+            position: relative;
+            width: 960px;
+            height: 640px;
+            background: #1e272e;
+            border-radius: 20px;
+            box-shadow: 0 0 0 12px #34495e, 0 30px 60px rgba(0,0,0,0.8);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background-color: #81ecec;
+        }
+
+        /* --- UI 層 --- */
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex; flex-direction: column; justify-content: space-between;
+            z-index: 10;
+        }
+
+        .hud-bar {
+            padding: 15px 25px;
+            display: flex; justify-content: space-between; align-items: center;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+        }
+
+        .stat-badge {
+            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px);
+            padding: 8px 16px; border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            display: flex; align-items: center; gap: 8px;
+            font-size: 18px; font-weight: 600;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        .hp-bar-container {
+            width: 200px; height: 24px;
+            background: rgba(0,0,0,0.6); border-radius: 12px;
+            overflow: hidden; border: 2px solid rgba(255,255,255,0.3);
+            position: relative;
+        }
+        .hp-bar-fill {
+            height: 100%; width: 100%;
+            background: linear-gradient(90deg, #ff7675, #d63031);
+            transition: width 0.3s;
+        }
+        .hp-text {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 12px; font-weight: bold; text-shadow: 0 1px 2px black;
+        }
+
+        /* --- 虛擬按鍵層 (Mobile Controls) --- */
+        #controls-layer {
+            position: absolute; bottom: 20px; left: 0; width: 100%; height: 180px;
+            pointer-events: none;
+            display: none;
+            z-index: 20;
+            padding: 0 40px; box-sizing: border-box;
+        }
+
+        .control-group { pointer-events: auto; position: relative; }
+
+        /* D-Pad */
+        #d-pad { width: 160px; height: 160px; position: absolute; left: 40px; bottom: 20px; }
+        .d-btn {
+            position: absolute; background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255,255,255,0.4); border-radius: 10px;
+            backdrop-filter: blur(4px); cursor: pointer; transition: background 0.1s;
+        }
+        .d-btn:active, .d-btn.active { background: rgba(255, 255, 255, 0.5); transform: scale(0.95); }
+        .d-up { top: 0; left: 50px; width: 60px; height: 60px; }
+        .d-down { bottom: 0; left: 50px; width: 60px; height: 60px; }
+        .d-left { top: 50px; left: 0; width: 60px; height: 60px; }
+        .d-right { top: 50px; right: 0; width: 60px; height: 60px; }
+        
+        /* Action Buttons */
+        #action-pad { width: 180px; height: 180px; position: absolute; right: 40px; bottom: 20px; }
+        .act-btn {
+            position: absolute; border-radius: 50%; background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255,255,255,0.4); color: white; font-weight: bold; font-size: 24px;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(4px); box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer;
+        }
+        .act-btn:active, .act-btn.active { background: rgba(255, 255, 255, 0.6); transform: scale(0.95); }
+        .btn-a { bottom: 10px; right: 10px; width: 90px; height: 90px; background: rgba(9, 132, 227, 0.4); }
+        .btn-b { top: 20px; left: 10px; width: 60px; height: 60px; background: rgba(214, 48, 49, 0.4); font-size: 18px; }
+
+        /* Rhythm Controls */
+        #rhythm-pad {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 400px; height: 100px; display: none; gap: 20px;
+        }
+        .rhy-btn {
+            flex: 1; height: 100%; background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255,255,255,0.3); border-radius: 0 0 10px 10px;
+            color: rgba(255,255,255,0.7); font-size: 24px; font-weight: bold;
+            display: flex; align-items: flex-end; justify-content: center; padding-bottom: 20px; cursor: pointer;
+        }
+        .rhy-btn:active, .rhy-btn.active { background: linear-gradient(to top, rgba(255,255,255,0.6), transparent); }
+
+        /* --- 登入畫面 --- */
+        #login-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100;
+        }
+        .login-box {
+            background: white; padding: 40px; border-radius: 20px; text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3); color: var(--dark); animation: popIn 0.5s;
+        }
+        .login-box input {
+            padding: 15px; border-radius: 10px; border: 2px solid #ddd;
+            width: 250px; font-size: 18px; margin: 20px 0; outline: none;
+        }
+
+        /* --- 主選單 --- */
+        #menu-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #2980b9, #000);
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 20;
+        }
+        
+        .user-panel {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 15px; text-align: right;
+        }
+
+        .game-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px;
+            margin-top: 30px;
+        }
+
+        .game-card {
+            background: rgba(255,255,255,0.95); color: var(--dark);
+            width: 180px; padding: 20px; border-radius: 20px;
+            text-align: center; cursor: pointer; position: relative;
+            transition: transform 0.2s, box-shadow 0.2s;
+            pointer-events: auto; box-shadow: 0 10px 0 rgba(0,0,0,0.2);
+        }
+        .game-card:hover { transform: translateY(-8px); box-shadow: 0 18px 0 rgba(0,0,0,0.1); }
+        .game-card-icon { font-size: 48px; display: block; margin-bottom: 10px; }
+        .game-card h3 { margin: 0; font-size: 20px; }
+        .game-card small { color: #666; font-size: 14px; display: block; margin-top: 5px; }
+
+        /* --- 商店 --- */
+        #store-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); display: none;
+            flex-direction: column; align-items: center; justify-content: center; z-index: 30;
+        }
+        .store-items { display: flex; gap: 30px; margin: 40px 0; }
+        .store-card {
+            background: #2d3436; border: 3px solid #636e72; color: white;
+            width: 220px; padding: 25px; border-radius: 20px; text-align: center;
+            cursor: pointer; transition: 0.2s; pointer-events: auto;
+        }
+        .store-card:hover { border-color: var(--gold); transform: scale(1.05); }
+        .store-card.owned { border-color: var(--accent); opacity: 0.5; cursor: default; }
+        .price { color: var(--gold); font-size: 24px; font-weight: bold; margin-top: 10px; }
+
+        /* --- 彈窗 (說明/暫停/結算) --- */
+        #modal-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            display: none; align-items: center; justify-content: center;
+            z-index: 50; pointer-events: auto;
+        }
+        .modal-box {
+            background: #fff; color: #2d3436;
+            padding: 40px; border-radius: 25px;
+            max-width: 600px; width: 90%; text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+            animation: slideUp 0.3s;
+        }
+        .modal-content { text-align: left; background: #f1f2f6; padding: 20px; border-radius: 10px; margin: 20px 0; }
+        .key-tag { background: #dfe6e9; border: 1px solid #b2bec3; border-radius: 4px; padding: 2px 6px; font-family: monospace; font-weight: bold; box-shadow: 0 2px 0 #b2bec3; }
+
+        /* --- AI Chat 彈窗 --- */
+        #ai-modal {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            display: none; align-items: center; justify-content: center;
+            z-index: 60; pointer-events: auto;
+        }
+        .ai-chat-box {
+            background: #fff; width: 500px; height: 500px;
+            border-radius: 20px; display: flex; flex-direction: column;
+            overflow: hidden; box-shadow: 0 0 30px rgba(162, 155, 254, 0.5);
+            animation: slideUp 0.3s;
+        }
+        .ai-header {
+            background: linear-gradient(90deg, #6c5ce7, #a29bfe);
+            padding: 15px; color: white; display: flex; justify-content: space-between; align-items: center;
+        }
+        .ai-body {
+            flex: 1; padding: 20px; overflow-y: auto; background: #f1f2f6;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .ai-input-area {
+            padding: 15px; background: white; border-top: 1px solid #ddd; display: flex; gap: 10px;
+        }
+        .ai-input {
+            flex: 1; padding: 10px; border-radius: 20px; border: 1px solid #ddd; outline: none;
+        }
+        .chat-msg {
+            max-width: 80%; padding: 10px 15px; border-radius: 15px; font-size: 14px; line-height: 1.4;
+        }
+        .chat-user { align-self: flex-end; background: #0984e3; color: white; border-bottom-right-radius: 2px; }
+        .chat-ai { align-self: flex-start; background: white; color: #333; border: 1px solid #ddd; border-bottom-left-radius: 2px; }
+        .typing-dot { display: inline-block; width: 6px; height: 6px; background: #666; border-radius: 50%; margin: 0 2px; animation: bounce 1s infinite; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        /* --- 按鈕 --- */
+        .btn {
+            border: none; padding: 12px 30px; font-size: 18px; border-radius: 50px;
+            cursor: pointer; font-weight: bold; margin: 5px;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.2); transition: transform 0.1s;
+            pointer-events: auto; font-family: 'Fredoka', sans-serif;
+        }
+        .btn:active { transform: translateY(6px); box-shadow: none; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: #00b894; color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-gold { background: var(--gold); color: #2d3436; }
+        .btn-ai { background: var(--ai-color); color: white; box-shadow: 0 6px 0 #6c5ce7; }
+        .btn-ai:active { box-shadow: none; }
+
+        @keyframes popIn { from {transform: scale(0.8); opacity:0;} to {transform: scale(1); opacity:1;} }
+        @keyframes slideUp { from {transform: translateY(50px); opacity:0;} to {transform: translateY(0); opacity:1;} }
+        @keyframes bounce { 0%, 100% {transform:translateY(0);} 50% {transform:translateY(-5px);} }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- 遊戲中 HUD -->
+    <div id="ui-layer">
+        <div class="hud-bar">
+            <div style="display:flex; gap:15px;">
+                <div class="stat-badge level-badge" id="level-hud" style="opacity:0;">
+                    ⭐ <span id="level-val">1/16</span>
+                </div>
+                <div class="stat-badge" id="special-hud" style="opacity:0;">
+                    ⚡ <span id="special-val">0</span>
+                </div>
+            </div>
+            
+            <div style="display:flex; gap:15px; align-items: center;">
+                <div class="stat-badge">💰 <span id="game-coin">0</span></div>
+                <div class="hp-bar-container">
+                    <div class="hp-bar-fill" id="hp-bar"></div>
+                    <div class="hp-text"><span id="hp-text">100/100</span></div>
+                </div>
+            </div>
+        </div>
+        <div style="text-align: right; padding: 15px; opacity: 0.7; font-size: 14px;">
+            [ESC] 暫停選單
+        </div>
+    </div>
+
+    <!-- 虛擬按鍵層 -->
+    <div id="controls-layer">
+        <div id="d-pad">
+            <div class="d-btn d-up" data-key="ArrowUp"></div>
+            <div class="d-btn d-down" data-key="ArrowDown"></div>
+            <div class="d-btn d-left" data-key="ArrowLeft"></div>
+            <div class="d-btn d-right" data-key="ArrowRight"></div>
+        </div>
+        <div id="action-pad">
+            <div class="act-btn btn-a" data-key="Space">A</div>
+            <div class="act-btn btn-b" data-key="KeyB">B</div>
+        </div>
+        <div id="rhythm-pad">
+            <div class="rhy-btn" data-key="KeyD">D</div>
+            <div class="rhy-btn" data-key="KeyF">F</div>
+            <div class="rhy-btn" data-key="KeyJ">J</div>
+            <div class="rhy-btn" data-key="KeyK">K</div>
+        </div>
+    </div>
+
+    <!-- 1. 登入畫面 -->
+    <div id="login-screen">
+        <div class="login-box">
+            <h1 style="font-size: 48px; color: var(--primary); margin-bottom: 10px;">🚀 ROBLOX 遊戲盒</h1>
+            <p style="font-size: 20px; color: #636e72;">16 關極限挑戰 x 道具商店 x AI 助手</p>
+            <input type="text" id="username" placeholder="輸入你的名字" maxlength="12">
+            <br>
+            <button class="btn btn-primary" onclick="App.login()">開始冒險</button>
+        </div>
+    </div>
+
+    <!-- 2. 主選單 -->
+    <div id="menu-screen">
+        <div class="user-panel">
+            <h2 style="margin:0; font-size:24px;">👤 <span id="display-name">Guest</span></h2>
+            <div style="font-size:20px; color:var(--gold); margin-top:5px;">💰 <span id="display-coin">0</span></div>
+        </div>
+
+        <h1 style="font-size: 56px; text-shadow: 0 5px 15px rgba(0,0,0,0.5);">遊戲大廳</h1>
+        
+        <div class="game-grid">
+            <div class="game-card" onclick="App.showInfo(0)">
+                <span class="game-card-icon">🗺️</span>
+                <h3>迷宮探險</h3>
+                <small>探索與逃脫</small>
+            </div>
+            <div class="game-card" onclick="App.showInfo(1)">
+                <span class="game-card-icon">🚀</span>
+                <h3>星際守護者</h3>
+                <small>彈幕射擊</small>
+            </div>
+            <div class="game-card" onclick="App.showInfo(2)">
+                <span class="game-card-icon">🧩</span>
+                <h3>魔法推箱</h3>
+                <small>益智解謎</small>
+            </div>
+            <div class="game-card" onclick="App.showInfo(3)">
+                <span class="game-card-icon">🏎️</span>
+                <h3>極速飄移</h3>
+                <small>反應挑戰</small>
+            </div>
+            <div class="game-card" onclick="App.showInfo(4)">
+                <span class="game-card-icon">🔦</span>
+                <h3>恐怖醫院</h3>
+                <small>生存收集</small>
+            </div>
+            <div class="game-card" onclick="App.showInfo(5)">
+                <span class="game-card-icon">🎵</span>
+                <h3>節奏大師</h3>
+                <small>音樂打擊</small>
+            </div>
+        </div>
+        <br>
+        <div style="display:flex; gap: 20px;">
+            <button class="btn btn-gold" style="width: 200px;" onclick="App.openStore()">🛒 道具商店</button>
+            <button class="btn btn-ai" style="width: 200px;" onclick="App.openAI()">✨ AI 攻略大神</button>
+        </div>
+    </div>
+
+    <!-- 3. 商店 -->
+    <div id="store-screen">
+        <h2 style="color:white; font-size: 42px;">🛒 道具商店</h2>
+        <div style="color:var(--gold); font-size:24px;">持有金幣: <span id="store-coin">0</span></div>
+        
+        <div class="store-items">
+            <div class="store-card" id="item-speed" onclick="App.buy('speed', 500)">
+                <div style="font-size:50px;">⚡</div>
+                <h3>速度戰靴</h3>
+                <p>所有遊戲移動速度 +20%</p>
+                <div class="price">💰 500</div>
+            </div>
+            <div class="store-card" id="item-hp" onclick="App.buy('hp', 800)">
+                <div style="font-size:50px;">❤️</div>
+                <h3>泰坦之心</h3>
+                <p>生命上限提升至 150%</p>
+                <div class="price">💰 800</div>
+            </div>
+            <div class="store-card" id="item-skin" onclick="App.buy('skin', 2000)">
+                <div style="font-size:50px;">😎</div>
+                <h3>黃金 VIP</h3>
+                <p>解鎖尊爵不凡的黃金外觀</p>
+                <div class="price">💰 2000</div>
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="App.closeStore()">返回大廳</button>
+    </div>
+
+    <!-- 4. 萬用彈窗 -->
+    <div id="modal-overlay">
+        <div class="modal-box">
+            <h2 id="m-title" style="margin-top:0;">標題</h2>
+            <div class="modal-content" id="m-body"></div>
+            <div id="m-footer"></div>
+        </div>
+    </div>
+
+    <!-- 5. AI Chat 彈窗 -->
+    <div id="ai-modal">
+        <div class="ai-chat-box">
+            <div class="ai-header">
+                <span style="font-size: 20px; font-weight: bold;">✨ AI 攻略大神</span>
+                <button onclick="App.closeAI()" style="background:none; border:none; color:white; font-size:20px; cursor:pointer;">✕</button>
+            </div>
+            <div class="ai-body" id="chat-history">
+                <div class="chat-msg chat-ai">你好！我是這裡的 AI 遊戲導師。<br>有任何過不去的關卡，或是想知道賺錢的小撇步，都可以問我喔！</div>
+            </div>
+            <div class="ai-input-area">
+                <input type="text" id="ai-input" class="ai-input" placeholder="輸入問題... (例如：這遊戲怎麼玩？)" onkeypress="if(event.key==='Enter') App.sendAI()">
+                <button class="btn btn-ai" style="padding: 8px 20px; font-size: 16px; margin:0;" onclick="App.sendAI()">發送</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+/**
+ * 遊戲核心引擎 + AI 功能
+ */
+const App = (function() {
+    // --- 系統變數 ---
+    const apiKey = ""; // 執行環境會自動提供 API Key
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const WIDTH = 960, HEIGHT = 640;
+    
+    // 縮放適配
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = WIDTH * dpr; canvas.height = HEIGHT * dpr;
+    canvas.style.width = WIDTH+'px'; canvas.style.height = HEIGHT+'px';
+    ctx.scale(dpr, dpr);
+
+    // --- 玩家資料 ---
+    const User = {
+        name: "Guest",
+        coins: 200,
+        upgrades: { speed: false, hp: false, skin: false }
+    };
+
+    // --- DOM 快取 ---
+    const UI = {
+        screens: {
+            login: document.getElementById('login-screen'),
+            menu: document.getElementById('menu-screen'),
+            store: document.getElementById('store-screen'),
+            modal: document.getElementById('modal-overlay'),
+            ai: document.getElementById('ai-modal')
+        },
+        hud: {
+            level: document.getElementById('level-hud'),
+            levelVal: document.getElementById('level-val'),
+            special: document.getElementById('special-hud'),
+            specialVal: document.getElementById('special-val'),
+            coin: document.getElementById('game-coin'),
+            hpBar: document.getElementById('hp-bar'),
+            hpText: document.getElementById('hp-text')
+        },
+        controls: {
+            layer: document.getElementById('controls-layer'),
+            dpad: document.getElementById('d-pad'),
+            action: document.getElementById('action-pad'),
+            rhythm: document.getElementById('rhythm-pad')
+        },
+        display: {
+            name: document.getElementById('display-name'),
+            coin: document.getElementById('display-coin'),
+            storeCoin: document.getElementById('store-coin')
+        },
+        modal: {
+            title: document.getElementById('m-title'),
+            body: document.getElementById('m-body'),
+            footer: document.getElementById('m-footer')
+        },
+        ai: {
+            history: document.getElementById('chat-history'),
+            input: document.getElementById('ai-input')
+        }
+    };
+
+    // --- 全域遊戲狀態 ---
+    const G = {
+        activeGame: null,
+        paused: false,
+        keys: {},
+        prevKeys: {},
+        frame: 0,
+        loopId: null
+    };
+
+    // --- 輸入處理 ---
+    const updateKey = (code, down) => {
+        G.keys[code] = down;
+        if (code === 'KeyB') G.keys['KeyR'] = down;
+        if (code === 'ArrowUp') G.keys['KeyW'] = down;
+        if (code === 'ArrowDown') G.keys['KeyS'] = down;
+        if (code === 'ArrowLeft') G.keys['KeyA'] = down;
+        if (code === 'ArrowRight') G.keys['KeyD'] = down;
+    };
+
+    window.addEventListener('keydown', e => { updateKey(e.code, true); if(e.code==='Escape') togglePause(); });
+    window.addEventListener('keyup', e => updateKey(e.code, false));
+
+    // 虛擬按鍵
+    document.querySelectorAll('[data-key]').forEach(btn => {
+        const key = btn.dataset.key;
+        const press = (e) => { e.preventDefault(); btn.classList.add('active'); updateKey(key, true); };
+        const release = (e) => { e.preventDefault(); btn.classList.remove('active'); updateKey(key, false); };
+        btn.addEventListener('mousedown', press);
+        btn.addEventListener('mouseup', release);
+        btn.addEventListener('mouseleave', release);
+        btn.addEventListener('touchstart', press, {passive: false});
+        btn.addEventListener('touchend', release, {passive: false});
+    });
+
+    const isDown = k => !!G.keys[k];
+    const isPress = k => !!G.keys[k] && !G.prevKeys[k];
+
+    // --- 繪圖工具 ---
+    const Draw = {
+        rect: (x,y,w,h,c) => { ctx.fillStyle=c; ctx.beginPath(); ctx.roundRect(x,y,w,h,6); ctx.fill(); },
+        circle: (x,y,r,c) => { ctx.fillStyle=c; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); },
+        text: (str,x,y,s=24,c='#fff') => { ctx.fillStyle=c; ctx.font=`bold ${s}px Fredoka`; ctx.textAlign='center'; ctx.fillText(str,x,y); },
+        player: (x,y,color,scale=1) => {
+            const s = scale;
+            if(User.upgrades.skin) color = '#f1c40f';
+            ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(x, y+14*s, 12*s, 5*s, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(x-12*s, y-16*s, 24*s, 28*s, 6*s); ctx.fill();
+            ctx.fillStyle = '#ffeaa7'; ctx.beginPath(); ctx.roundRect(x-10*s, y-30*s, 20*s, 20*s, 5*s); ctx.fill();
+            ctx.fillStyle = '#2d3436'; ctx.beginPath(); ctx.arc(x-4*s, y-26*s, 2*s, 0, Math.PI*2); ctx.arc(x+4*s, y-26*s, 2*s, 0, Math.PI*2); ctx.fill();
+        }
+    };
+
+    // --- 音效 ---
+    const AudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const Sfx = (freq, type, dur) => {
+        if(AudioCtx.state === 'suspended') AudioCtx.resume();
+        const o = AudioCtx.createOscillator(); const g = AudioCtx.createGain();
+        o.type=type; o.frequency.setValueAtTime(freq, AudioCtx.currentTime);
+        g.gain.setValueAtTime(0.1, AudioCtx.currentTime); 
+        g.gain.exponentialRampToValueAtTime(0.01, AudioCtx.currentTime+dur);
+        o.connect(g); g.connect(AudioCtx.destination); o.start(); o.stop(AudioCtx.currentTime+dur);
+    };
+    const Sounds = {
+        coin: () => Sfx(1200, 'sine', 0.1),
+        hit: () => Sfx(150, 'sawtooth', 0.3),
+        win: () => { Sfx(500,'square',0.1); setTimeout(()=>Sfx(800,'square',0.2),100); }
+    };
+
+    // --- Gemini AI 整合 ---
+    async function callGemini(prompt) {
+        const systemPrompt = `你是一個 Roblox 風格遊戲盒的「AI 攻略大神」。這是一個 Web App 遊戲，包含六款小遊戲，每款都有 16 個關卡，後半段關卡會變難。
+        
+        遊戲列表：
+        1. 迷宮探險 (Maze)：找出口，躲避怪物。9-16關是黑夜模式。技巧：沿牆走。
+        2. 星際守護者 (Space)：彈幕射擊，每4關有BOSS。A鍵射擊，B鍵炸彈。技巧：優先升級速度。
+        3. 魔法推箱 (Puzzle)：推箱子到紅點。技巧：先想好路徑，不要把箱子推死角。B鍵重置。
+        4. 極速飄移 (Racing)：閃避障礙。技巧：專注前方，不要貪吃金幣。
+        5. 恐怖醫院 (Horror)：蒐集鑰匙，躲鬼。手電筒會沒電。技巧：記住鑰匙位置，速戰速決。
+        6. 節奏大師 (Rhythm)：按 D/F/J/K。技巧：聽音樂節拍，不要只看螢幕。
+
+        商店道具：
+        - 速度戰靴 (500金幣)：加速 20%。
+        - 泰坦之心 (800金幣)：血量 150%。
+        - 黃金 VIP (2000金幣)：超帥金色造型。
+
+        玩家名字：${User.name}。玩家目前金幣：${User.coins}。
+        請用繁體中文回答，語氣要活潑、像個專業的遊戲實況主或導師。回答盡量簡短有力 (100字以內)。`;
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    systemInstruction: { parts: [{ text: systemPrompt }] }
+                })
+            });
+            const data = await response.json();
+            return data.candidates[0].content.parts[0].text;
+        } catch (error) {
+            console.error(error);
+            return "哎呀，連線有點問題，請稍後再試！(API Error)";
+        }
+    }
+
+    // --- AI UI 邏輯 ---
+    function openAI() { UI.screens.ai.style.display = 'flex'; UI.ai.input.focus(); }
+    function closeAI() { UI.screens.ai.style.display = 'none'; }
+    
+    async function sendAI() {
+        const text = UI.ai.input.value.trim();
+        if(!text) return;
+        
+        // Add User Message
+        const uDiv = document.createElement('div');
+        uDiv.className = 'chat-msg chat-user';
+        uDiv.innerText = text;
+        UI.ai.history.appendChild(uDiv);
+        UI.ai.input.value = '';
+        UI.ai.history.scrollTop = UI.ai.history.scrollHeight;
+
+        // Add Loading
+        const lDiv = document.createElement('div');
+        lDiv.className = 'chat-msg chat-ai';
+        lDiv.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+        UI.ai.history.appendChild(lDiv);
+
+        // Call API
+        const reply = await callGemini(text);
+
+        // Remove loading and add Reply
+        UI.ai.history.removeChild(lDiv);
+        const rDiv = document.createElement('div');
+        rDiv.className = 'chat-msg chat-ai';
+        rDiv.innerText = reply;
+        UI.ai.history.appendChild(rDiv);
+        UI.ai.history.scrollTop = UI.ai.history.scrollHeight;
+    }
+
+    // --- 遊戲邏輯 ---
+    function login() {
+        const name = document.getElementById('username').value.trim();
+        User.name = name || "冒險者";
+        UI.screens.login.style.display = 'none';
+        UI.screens.menu.style.display = 'flex';
+        updateStats();
+    }
+
+    function updateStats() {
+        UI.display.name.innerText = User.name;
+        UI.display.coin.innerText = User.coins;
+        UI.display.storeCoin.innerText = User.coins;
+        UI.hud.coin.innerText = User.coins;
+        ['speed','hp','skin'].forEach(item => {
+            const el = document.getElementById('item-'+item);
+            if(User.upgrades[item]) el.classList.add('owned');
+        });
+    }
+
+    function openStore() { UI.screens.menu.style.display='none'; UI.screens.store.style.display='flex'; updateStats(); }
+    function closeStore() { UI.screens.store.style.display='none'; UI.screens.menu.style.display='flex'; }
+
+    function buy(item, cost) {
+        if(User.upgrades[item]) return;
+        if(User.coins >= cost) {
+            User.coins -= cost; User.upgrades[item] = true; Sounds.coin(); updateStats();
+        } else alert("金幣不足！去玩遊戲賺錢吧！");
+    }
+
+    function showInfo(gameId) {
+        const Info = GameInfos[gameId];
+        UI.modal.title.innerText = Info.title;
+        UI.modal.title.style.color = '#0984e3';
+        UI.modal.body.innerHTML = `
+            <p><b>🎯 遊戲目標：</b><br>${Info.goal}</p>
+            <p><b>🎮 操作方法：</b><br>${Info.controls}</p>
+            <p><b>⚠️ 關卡機制：</b><br>共 16 關。${Info.levels}</p>
+        `;
+        UI.modal.footer.innerHTML = `
+            <button class="btn btn-success" onclick="App.start(${gameId})">開始挑戰</button>
+            <button class="btn btn-danger" onclick="App.closeModal()">取消</button>
+        `;
+        UI.screens.modal.style.display = 'flex';
+    }
+
+    function closeModal() { UI.screens.modal.style.display = 'none'; }
+
+    function start(gameId) {
+        closeModal(); UI.screens.menu.style.display = 'none';
+        UI.controls.layer.style.display = 'block';
+        if (gameId === 5) {
+            UI.controls.dpad.style.display = 'none'; UI.controls.action.style.display = 'none'; UI.controls.rhythm.style.display = 'flex';
+        } else {
+            UI.controls.dpad.style.display = 'block'; UI.controls.action.style.display = 'block'; UI.controls.rhythm.style.display = 'none';
+        }
+        const GameClass = [MazeGame, SpaceGame, PuzzleGame, RacingGame, HorrorGame, RhythmGame][gameId];
+        G.activeGame = new GameClass(); G.activeGame.init(); G.paused = false; if(!G.loopId) loop();
+    }
+
+    function togglePause() {
+        if(!G.activeGame) return;
+        G.paused = !G.paused;
+        if(G.paused) {
+            UI.modal.title.innerText = "⏸️ 暫停";
+            UI.modal.body.innerHTML = "<p>休息一下，喝口水吧！</p>";
+            UI.modal.footer.innerHTML = `<button class="btn btn-success" onclick="App.togglePause()">繼續遊戲</button><button class="btn btn-danger" onclick="App.exit()">離開遊戲</button>`;
+            UI.screens.modal.style.display = 'flex';
+        } else closeModal();
+    }
+
+    function exit() {
+        G.activeGame = null; closeModal(); UI.screens.menu.style.display = 'flex';
+        UI.controls.layer.style.display = 'none'; UI.hud.level.style.opacity = 0; UI.hud.special.style.opacity = 0;
+    }
+
+    function levelComplete(win, msg, reward=0) {
+        G.paused = true;
+        if(win) {
+            Sounds.win(); User.coins += reward;
+            const nextLvl = G.activeGame.level + 1;
+            UI.modal.title.innerText = "🎉 關卡完成！"; UI.modal.title.style.color = "#00b894";
+            UI.modal.body.innerHTML = `<p>${msg}</p><p style="color:#f1c40f; font-size:24px;">💰 +${reward}</p>`;
+            if(nextLvl <= 16) UI.modal.footer.innerHTML = `<button class="btn btn-success" onclick="App.nextLvl()">下一關 (Lv.${nextLvl})</button>`;
+            else { UI.modal.body.innerHTML += "<p>🏆 恭喜！你已經完成了所有 16 個關卡！</p>"; UI.modal.footer.innerHTML = `<button class="btn btn-primary" onclick="App.exit()">領取獎勵回大廳</button>`; }
+        } else {
+            Sounds.hit(); UI.modal.title.innerText = "💔 挑戰失敗"; UI.modal.title.style.color = "#d63031";
+            UI.modal.body.innerHTML = `<p>${msg}</p>`; UI.modal.footer.innerHTML = `<button class="btn btn-success" onclick="App.retry()">重試</button><button class="btn btn-danger" onclick="App.exit()">放棄</button>`;
+        }
+        UI.screens.modal.style.display = 'flex'; updateStats();
+    }
+
+    function nextLvl() { closeModal(); G.activeGame.level++; G.activeGame.startLevel(); G.paused=false; }
+    function retry() { closeModal(); G.activeGame.startLevel(); G.paused=false; }
+
+    function loop(t) {
+        if(G.activeGame && !G.paused) {
+            Draw.rect(0,0,WIDTH,HEIGHT,'#2d3436'); G.activeGame.update(); G.activeGame.draw(); G.frame++;
+        }
+        G.prevKeys = {...G.keys}; G.loopId = requestAnimationFrame(loop);
+    }
+
+    const GameInfos = [
+        { title: "迷宮探險", goal: "找到迷宮出口(Exit)。", controls: "方向鍵 / 虛擬搖桿 移動", levels: "每關地圖變大，9-16關為黑夜模式。" },
+        { title: "星際守護者", goal: "擊敗外星戰機與 BOSS。", controls: "搖桿移動，A鍵射擊，B鍵炸彈", levels: "第 4, 8, 12, 16 關為 BOSS 戰。" },
+        { title: "魔法推箱", goal: "將箱子推到紅點上。", controls: "搖桿推箱，B鍵重置", levels: "1-8 關基礎，9-16 關為鏡像困難版。" },
+        { title: "極速飄移", goal: "閃避障礙抵達終點。", controls: "左右搖桿移動", levels: "速度隨關卡提升，障礙物變多。" },
+        { title: "恐怖醫院", goal: "收集所有鑰匙逃脫。", controls: "搖桿移動，避免鬼魂", levels: "鬼魂數量增加，手電筒耗電變快。" },
+        { title: "節奏大師", goal: "在正確時機按下按鍵。", controls: "專屬 D, F, J, K 按鍵", levels: "音符速度與密度隨關卡提升。" }
+    ];
+
+    class BaseGame { constructor(){this.level=1;} init(){this.startLevel();} updateHUD(hp,maxHp,special=null){UI.hud.level.style.opacity=1; UI.hud.levelVal.innerText=`${this.level}/16`; if(special!==null){UI.hud.special.style.opacity=1; UI.hud.specialVal.innerText=special;}else{UI.hud.special.style.opacity=0;} const pct=Math.max(0,(hp/maxHp)*100); UI.hud.hpBar.style.width=pct+'%'; UI.hud.hpText.innerText=`${Math.ceil(hp)}/${maxHp}`;}}
+    class MazeGame extends BaseGame { startLevel(){ let maxHp=User.upgrades.hp?150:100; let spd=4+this.level*0.2; if(User.upgrades.speed)spd*=1.2; this.p={x:50,y:50,hp:maxHp,maxHp:maxHp,spd:spd}; this.exit={x:WIDTH-60,y:HEIGHT-60}; this.walls=[]; let density=15+this.level*3; this.walls.push({x:0,y:0,w:WIDTH,h:20},{x:0,y:HEIGHT-20,w:WIDTH,h:20},{x:0,y:0,w:20,h:HEIGHT},{x:WIDTH-20,y:0,w:20,h:HEIGHT}); for(let i=0;i<density;i++){let w=Math.random()>0.5?100:20; let h=w===20?100:20; this.walls.push({x:Math.random()*(WIDTH-w),y:Math.random()*(HEIGHT-h),w,h});} this.enemies=[]; let count=2+Math.floor(this.level/2); for(let i=0;i<count;i++)this.enemies.push({x:300+Math.random()*500,y:200+Math.random()*300,vx:2,vy:2});} update(){ let mx=0,my=0; if(isDown('ArrowUp'))my=-this.p.spd; if(isDown('ArrowDown'))my=this.p.spd; if(isDown('ArrowLeft'))mx=-this.p.spd; if(isDown('ArrowRight'))mx=this.p.spd; let nx=this.p.x+mx, ny=this.p.y+my; if(!this.chk(nx,this.p.y))this.p.x=nx; if(!this.chk(this.p.x,ny))this.p.y=ny; this.enemies.forEach(e=>{e.x+=e.vx;e.y+=e.vy; if(this.chk(e.x,e.y)){e.vx*=-1;e.vy*=-1;e.x+=e.vx;e.y+=e.vy;} if(Math.hypot(this.p.x-e.x,this.p.y-e.y)<25){this.p.hp-=2;Sounds.hit();}}); this.updateHUD(this.p.hp,this.p.maxHp); if(this.p.hp<=0)levelComplete(false,"你被怪物抓住了！"); if(Math.hypot(this.p.x-this.exit.x,this.p.y-this.exit.y)<40)levelComplete(true,"成功逃脫！",50+this.level*10);} chk(x,y){return this.walls.some(w=>x+10>w.x&&x-10<w.x+w.w&&y+10>w.y&&y-10<w.y+w.h);} draw(){ if(this.level>8){ctx.fillStyle='#2d3436';ctx.fillRect(0,0,WIDTH,HEIGHT); ctx.save();ctx.beginPath();ctx.arc(this.p.x,this.p.y,250,0,6.28);ctx.clip(); ctx.fillStyle='#55efc4';ctx.fillRect(0,0,WIDTH,HEIGHT);}else{ctx.fillStyle='#55efc4';ctx.fillRect(0,0,WIDTH,HEIGHT);} Draw.text("EXIT",this.exit.x,this.exit.y-40); Draw.player(this.exit.x,this.exit.y,'#f1c40f'); this.walls.forEach(w=>Draw.rect(w.x,w.y,w.w,w.h,'#2d3436')); this.enemies.forEach(e=>Draw.player(e.x,e.y,'#ff7675')); Draw.player(this.p.x,this.p.y,'#0984e3'); if(this.level>8)ctx.restore(); } }
+    class SpaceGame extends BaseGame { startLevel(){let hp=User.upgrades.hp?150:100; this.p={x:WIDTH/2,y:HEIGHT-80,hp,maxHp:hp,bomb:2}; this.bulls=[]; this.enems=[]; this.t=0; this.isBoss=(this.level%4===0); this.boss=this.isBoss?{x:WIDTH/2,y:-100,hp:100*this.level,max:100*this.level}:null; this.target=20+this.level*5; this.kills=0;} update(){ if(isDown('ArrowLeft')&&this.p.x>30)this.p.x-=6; if(isDown('ArrowRight')&&this.p.x<WIDTH-30)this.p.x+=6; if(isPress('Space')){this.bulls.push({x:this.p.x,y:this.p.y-20,vy:-12,t:'p'}); if(User.upgrades.speed)this.bulls.push({x:this.p.x,y:this.p.y-20,vy:-10,vx:2,t:'p'},{x:this.p.x,y:this.p.y-20,vy:-10,vx:-2,t:'p'});} if(isPress('KeyB')&&this.p.bomb>0){this.p.bomb--;this.enems=[];if(this.boss)this.boss.hp-=100;Sounds.hit();} this.t++; if(!this.boss&&this.kills<this.target&&this.t%(40-this.level)===0)this.enems.push({x:Math.random()*(WIDTH-60)+30,y:-40,hp:1+this.level/2,t:'m'}); if(this.boss){if(this.boss.y<100)this.boss.y+=2; this.boss.x+=Math.sin(this.t/50)*5; if(this.t%50===0)this.bulls.push({x:this.boss.x,y:this.boss.y+60,vy:5,t:'e'}); if(this.boss.hp<=0)levelComplete(true,"BOSS 擊破！",300);}else if(this.kills>=this.target&&this.enems.length===0)levelComplete(true,"星域掃蕩完成！",100); this.bulls.forEach(b=>{b.x+=(b.vx||0);b.y+=b.vy;}); this.enems.forEach(e=>{e.y+=3;if(e.y>HEIGHT){this.p.hp-=10;e.dead=true;}}); this.bulls=this.bulls.filter(b=>{let hit=false;if(b.t==='p'){this.enems.forEach(e=>{if(Math.hypot(b.x-e.x,b.y-e.y)<30){e.hp--;hit=true;if(e.hp<=0){e.dead=true;this.kills++;}}}); if(this.boss&&Math.hypot(b.x-this.boss.x,b.y-this.boss.y)<80){this.boss.hp--;hit=true;}}else{if(Math.hypot(b.x-this.p.x,b.y-this.p.y)<20){this.p.hp-=10;hit=true;Sounds.hit();}} return !hit&&b.y>-50&&b.y<HEIGHT+50;}); this.enems=this.enems.filter(e=>!e.dead); this.updateHUD(this.p.hp,this.p.maxHp,this.p.bomb); if(this.p.hp<=0)levelComplete(false,"戰機墜毀..."); } draw(){ ctx.fillStyle='#000';ctx.fillRect(0,0,WIDTH,HEIGHT); Draw.player(this.p.x,this.p.y,'#74b9ff'); this.enems.forEach(e=>Draw.player(e.x,e.y,'#ff7675')); this.bulls.forEach(b=>Draw.circle(b.x,b.y,6,b.t==='p'?'#ffeaa7':'#ff7675')); if(this.boss){Draw.player(this.boss.x,this.boss.y,'#a29bfe',4); Draw.rect(this.boss.x-50,this.boss.y-80,100*(this.boss.hp/this.boss.max),10,'red');} } }
+    class PuzzleGame extends BaseGame { startLevel(){ const maps=[[[1,1,1,1,1],[1,0,3,2,1],[1,0,4,0,1],[1,1,1,1,1]],[[1,1,1,1,1],[1,4,2,3,1],[1,0,2,3,1],[1,1,1,1,1]],[[1,1,1,1,1,1],[1,4,0,1,3,1],[1,0,2,0,0,1],[1,0,0,1,3,1],[1,1,1,1,1,1]],[[1,1,1,1,1],[1,3,2,3,1],[1,0,4,0,1],[1,2,0,2,1],[1,3,0,3,1],[1,1,1,1,1]],[[1,1,1,1,1,1],[1,0,0,3,3,1],[1,0,2,2,0,1],[1,4,0,0,0,1],[1,1,1,1,1,1]],[[1,1,1,1,1,1],[1,3,0,2,0,1],[1,0,1,4,1,1],[1,0,2,0,3,1],[1,1,1,1,1,1]],[[1,1,1,1,1,1,1],[1,3,0,0,0,3,1],[1,0,2,4,2,0,1],[1,1,1,1,1,1,1]],[[1,1,1,1,1],[1,3,2,3,1],[1,2,4,2,1],[1,3,2,3,1],[1,1,1,1,1]]]; let idx=(this.level-1)%8; let m=JSON.parse(JSON.stringify(maps[idx])); if(this.level>8)m=m.map(row=>row.reverse()); this.map=m; this.r=m.length; this.c=m[0].length; this.ts=60; this.ox=(WIDTH-this.c*this.ts)/2; this.oy=(HEIGHT-this.r*this.ts)/2; for(let y=0;y<this.r;y++)for(let x=0;x<this.c;x++)if(this.map[y][x]===4)this.p={x,y}; } update(){ if(isPress('KeyR'))this.startLevel(); let dx=0,dy=0; if(isPress('ArrowUp'))dy=-1; if(isPress('ArrowDown'))dy=1; if(isPress('ArrowLeft'))dx=-1; if(isPress('ArrowRight'))dx=1; if(dx||dy){let nx=this.p.x+dx,ny=this.p.y+dy; let t=this.map[ny][nx]; if(t!==1){if(t===2||t===5){let bnx=nx+dx,bny=ny+dy; let bt=this.map[bny][bnx]; if(bt!==1&&bt!==2&&bt!==5){this.map[ny][nx]=(t===5?3:0); this.map[bny][bnx]=(bt===3?5:2); this.moveP(nx,ny);}}else this.moveP(nx,ny);}} let win=true; for(let y=0;y<this.r;y++)for(let x=0;x<this.c;x++)if(this.map[y][x]===3)win=false; if(win)levelComplete(true,"謎題解開！",80); this.updateHUD(100,100); } moveP(nx,ny){let c=this.map[this.p.y][this.p.x]; this.map[this.p.y][this.p.x]=(c===4?0:3); this.p={x:nx,y:ny}; let n=this.map[ny][nx]; this.map[ny][nx]=(n===3?4:4);} draw(){ ctx.fillStyle='#2d3436';ctx.fillRect(0,0,WIDTH,HEIGHT); for(let y=0;y<this.r;y++)for(let x=0;x<this.c;x++){let px=this.ox+x*this.ts,py=this.oy+y*this.ts,c=this.map[y][x]; if(c===1)Draw.rect(px,py,this.ts,this.ts,'#7f8c8d'); else{Draw.rect(px+2,py+2,this.ts-4,this.ts-4,'#bdc3c7'); if(c===3)Draw.circle(px+30,py+30,10,'#e74c3c'); if(c===2||c===5)Draw.rect(px+5,py+5,50,50,c===5?'#f1c40f':'#d35400'); if(c===4||(x===this.p.x&&y===this.p.y))Draw.player(px+30,py+40,'#8e44ad',1.2);}} Draw.text("[B] 重置關卡",WIDTH/2,HEIGHT-50); } }
+    class RacingGame extends BaseGame { startLevel(){this.px=WIDTH/2; this.spd=10+this.level*2; if(User.upgrades.speed)this.spd+=5; this.dist=0; this.max=1000+this.level*500; this.obs=[];} update(){ if(isDown('ArrowLeft'))this.px-=8; if(isDown('ArrowRight'))this.px+=8; this.px=Math.max(200,Math.min(WIDTH-200,this.px)); this.dist+=this.spd; if(Math.random()<0.05+this.level*0.01)this.obs.push({x:200+Math.random()*(WIDTH-400),y:0}); this.obs.forEach(o=>o.y+=this.spd); if(this.obs.some(o=>o.y>HEIGHT-100&&o.y<HEIGHT&&Math.abs(o.x-this.px)<40))levelComplete(false,"發生車禍！"); this.updateHUD(this.dist,this.max); if(this.dist>=this.max)levelComplete(true,"抵達終點！",80);} draw(){ let g=ctx.createLinearGradient(0,0,0,HEIGHT);g.addColorStop(0,'#74b9ff');g.addColorStop(1,'#2d3436'); ctx.fillStyle=g;ctx.fillRect(0,0,WIDTH,HEIGHT); ctx.fillStyle='#636e72';ctx.beginPath();ctx.moveTo(WIDTH/2,HEIGHT/2);ctx.lineTo(WIDTH-100,HEIGHT);ctx.lineTo(100,HEIGHT);ctx.fill(); this.obs.forEach(o=>Draw.rect(o.x-20,o.y,40,20,'#d63031')); Draw.player(this.px,HEIGHT-80,'#f1c40f',1.5); Draw.text(`${Math.floor(this.dist)}m / ${this.max}m`,WIDTH/2,50); } }
+    class HorrorGame extends BaseGame { startLevel(){this.p={x:WIDTH/2,y:HEIGHT/2,bat:User.upgrades.hp?150:100,max:User.upgrades.hp?150:100}; this.keys=[]; for(let i=0;i<2+Math.ceil(this.level/2);i++)this.keys.push({x:Math.random()*(WIDTH-100)+50,y:Math.random()*(HEIGHT-100)+50}); this.ghosts=[]; for(let i=0;i<1+Math.floor(this.level/3);i++)this.ghosts.push({x:0,y:0,s:1.5+this.level*0.2});} update(){ if(isDown('ArrowUp'))this.p.y-=3; if(isDown('ArrowDown'))this.p.y+=3; if(isDown('ArrowLeft'))this.p.x-=3; if(isDown('ArrowRight'))this.p.x+=3; this.p.bat-=0.05+this.level*0.01; this.ghosts.forEach(g=>{let a=Math.atan2(this.p.y-g.y,this.p.x-g.x); g.x+=Math.cos(a)*g.s; g.y+=Math.sin(a)*g.s; if(Math.hypot(this.p.x-g.x,this.p.y-g.y)<30)levelComplete(false,"被鬼抓到了！");}); this.keys=this.keys.filter(k=>Math.hypot(this.p.x-k.x,this.p.y-k.y)>30); this.updateHUD(this.p.bat,this.p.max); if(this.keys.length===0)levelComplete(true,"逃脫成功！",100); if(this.p.bat<=0)levelComplete(false,"電力耗盡...");} draw(){ ctx.fillStyle='#000';ctx.fillRect(0,0,WIDTH,HEIGHT); ctx.save();ctx.beginPath();ctx.arc(this.p.x,this.p.y,Math.max(50,this.p.bat*2.5),0,6.28);ctx.clip(); ctx.fillStyle='#2d3436';ctx.fillRect(0,0,WIDTH,HEIGHT); this.keys.forEach(k=>Draw.text("🔑",k.x,k.y,30)); this.ghosts.forEach(g=>Draw.player(g.x,g.y,'#636e72',1.5)); Draw.player(this.p.x,this.p.y,'#dfe6e9'); ctx.restore(); } }
+    class RhythmGame extends BaseGame { startLevel(){this.score=0; this.target=800+this.level*300; this.notes=[]; this.t=0; this.spd=6+this.level; this.lanes=[WIDTH/2-150,WIDTH/2-50,WIDTH/2+50,WIDTH/2+150];} update(){ this.t++; if(this.t%Math.max(15,50-this.level*2)===0)this.notes.push({x:this.lanes[Math.floor(Math.random()*4)],y:-50,l:Math.floor(Math.random()*4)}); this.notes.forEach(n=>n.y+=this.spd); ['KeyD','KeyF','KeyJ','KeyK'].forEach((k,i)=>{if(isPress(k)){let hit=this.notes.find(n=>n.l===i&&Math.abs(n.y-550)<50); if(hit){hit.dead=true;this.score+=100;Sounds.coin();}}}); this.notes=this.notes.filter(n=>!n.dead&&n.y<700); if(this.notes.filter(n=>n.y>650).length>10)levelComplete(false,"漏掉太多音符！"); this.updateHUD(this.score,this.target); if(this.score>=this.target)levelComplete(true,"演奏完美！",80);} draw(){ ctx.fillStyle='#2d3436';ctx.fillRect(0,0,WIDTH,HEIGHT); this.lanes.forEach((x,i)=>{ctx.strokeStyle='#636e72';ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,HEIGHT);ctx.stroke(); Draw.rect(x-40,550,80,10,'white'); Draw.text(['D','F','J','K'][i],x,600,20,'#b2bec3');}); this.notes.forEach(n=>{ctx.fillStyle=['#ff7675','#74b9ff','#55efc4','#a29bfe'][n.l]; ctx.beginPath();ctx.arc(n.x,n.y,30,0,6.28);ctx.fill();}); Draw.text(`目標分數: ${this.target}`,WIDTH/2,50); } }
+
+    return { login, openStore, closeStore, buy, showInfo, closeModal, start, togglePause, exit, nextLvl, retry, togglePause, openAI, closeAI, sendAI };
+})();
+</script>
+</body>
+</html>
